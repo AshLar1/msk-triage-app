@@ -1,6 +1,12 @@
 import streamlit as st
 import pandas as pd
 import joblib
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from lightgbm import LGBMClassifier
 
 # -----------------------------
 # Load trained triage model v2
