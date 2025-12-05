@@ -3,6 +3,12 @@ import pandas as pd
 import numpy as np
 import joblib
 
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.ensemble import RandomForestClassifier
+
 # -----------------------------
 # 1. LOAD MODEL
 # -----------------------------
