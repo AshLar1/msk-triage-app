@@ -292,6 +292,9 @@ st.markdown(
 # =========================================
 # 4. HERO SECTION (UPDATED IMAGE)
 # =========================================
+# =========================================
+# 4. HERO SECTION
+# =========================================
 hero_html = """
 <div class="hero">
     <div class="hero-left">
@@ -323,9 +326,11 @@ hero_html = """
              style="border-radius:1rem; box-shadow:0 15px 35px rgba(15,23,42,0.35); max-width:360px;">
     </div>
 </div>
-"""
+"""  
 
 st.markdown(hero_html, unsafe_allow_html=True)
+
+
 # =========================================
 # 5. WHAT IS / IMPACT SECTIONS
 # =========================================
