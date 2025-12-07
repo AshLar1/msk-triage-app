@@ -133,6 +133,12 @@ st.markdown(
             align-items: center;
             gap: 2.5rem;
         }
+        .hero-left {
+            flex: 1;
+        }
+        .hero-right {
+            flex-shrink: 0;
+        }
         .hero-title {
             font-size: 3rem;
             font-family: Georgia, 'Times New Roman', serif;
@@ -247,6 +253,18 @@ st.markdown(
             color: #94a3b8;
             text-align: center;
         }
+
+        @media(max-width: 900px) {
+            .hero {
+                flex-direction: column;
+                text-align: center;
+            }
+            .hero-sub {
+                margin-left: auto;
+                margin-right: auto;
+            }
+        }
+
     </style>
     """,
     unsafe_allow_html=True,
@@ -272,7 +290,7 @@ st.markdown(
 )
 
 # =========================================
-# 4. HERO SECTION
+# 4. HERO SECTION (UPDATED IMAGE)
 # =========================================
 hero_col = st.container()
 with hero_col:
