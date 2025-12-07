@@ -295,8 +295,8 @@ with hero_col:
             </div>
             <div>
                 <!-- Simple placeholder illustration - replace with your own URL if you like -->
-                <img src="https://images.pexels.com/photos/6129040/pexels-photo-6129040.jpeg?auto=compress&cs=tinysrgb&w=700"
-                     alt="Digital triage illustration" style="border-radius:0.8rem; box-shadow:0 15px 35px rgba(15,23,42,0.35); max-width:360px;">
+                <img src="https://images.pexels.com/photos/5281123/pexels-photo-5281123.jpeg?auto=compress&cs=tinysrgb&w=700"
+                     alt="Soft tissue injury illustration" style="border-radius:0.8rem; box-shadow:0 15px 35px rgba(15,23,42,0.35); max-width:360px;">
             </div>
         </div>
         """,
