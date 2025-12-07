@@ -292,39 +292,40 @@ st.markdown(
 # =========================================
 # 4. HERO SECTION (UPDATED IMAGE)
 # =========================================
-hero_col = st.container()
-with hero_col:
-    st.markdown(
-        """
-        <div class="hero">
-            <div class="hero-left">
-                <div style="font-size:0.8rem; text-transform:uppercase; letter-spacing:0.09em; color:#334e68; margin-bottom:0.3rem;">
-                    AI-enabled MSK triage · Prototype
-                </div>
-
-                <div class="hero-title">
-                    Smarter triage.<br>Better MSK care.
-                </div>
-
-                <div class="hero-sub">
-                    Explore how AI could support soft tissue and musculoskeletal triage by
-                    simulating likely outcomes for different treatment approaches – using
-                    synthetic data only.
-                </div>
-
-                <a class="hero-btn" href="#triage-form">Try the triage prototype</a>
-            </div>
-
-            <div class="hero-right">
-                <img src="https://images.pexels.com/photos/5281123/pexels-photo-5281123.jpeg?auto=compress&cs=tinysrgb&w=700"
-                    alt="Soft tissue injury illustration"
-                    style="border-radius:1rem; box-shadow:0 15px 35px rgba(15,23,42,0.35); max-width:360px;">
-            </div>
+hero_html = """
+<div class="hero">
+    <div class="hero-left">
+        <div style="
+            font-size:0.8rem;
+            text-transform:uppercase;
+            letter-spacing:0.09em;
+            color:#334e68;
+            margin-bottom:0.3rem;">
+            AI-enabled MSK triage · Prototype
         </div>
-        """,
-        unsafe_allow_html=True,
-    )
 
+        <div class="hero-title">
+            Smarter triage.<br>Better MSK care.
+        </div>
+
+        <div class="hero-sub">
+            Explore how AI could support soft tissue and musculoskeletal triage by
+            simulating likely outcomes for different treatment approaches – using
+            synthetic data only.
+        </div>
+
+        <a class="hero-btn" href="#triage-form">Try the triage prototype</a>
+    </div>
+
+    <div class="hero-right">
+        <img src="https://images.pexels.com/photos/5281123/pexels-photo-5281123.jpeg?auto=compress&cs=tinysrgb&w=700"
+             alt="Soft tissue injury illustration"
+             style="border-radius:1rem; box-shadow:0 15px 35px rgba(15,23,42,0.35); max-width:360px;">
+    </div>
+</div>
+"""
+
+st.markdown(hero_html, unsafe_allow_html=True)
 # =========================================
 # 5. WHAT IS / IMPACT SECTIONS
 # =========================================
