@@ -167,7 +167,7 @@ st.set_page_config(
     layout="wide",
 )
 
-# Global CSS – Visiba-inspired aesthetic
+# Global CSS – Visiba-inspired aesthetic + mobile tweaks
 st.markdown(
     """
     <style>
@@ -182,6 +182,14 @@ st.markdown(
             max-width: 1100px;
         }
 
+        /* Slightly tighter padding on mobiles */
+        @media (max-width: 768px) {
+            .block-container {
+                padding-left: 0.8rem !important;
+                padding-right: 0.8rem !important;
+            }
+        }
+
         /* NAV BAR */
         .navbar {
             width: 100%;
@@ -189,11 +197,18 @@ st.markdown(
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 0.75rem;
         }
         .nav-left {
             font-size: 1.4rem;
             font-weight: 600;
             color: #12355b;
+        }
+        .nav-right {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
         .nav-right span {
             margin-left: 1.1rem;
@@ -210,6 +225,24 @@ st.markdown(
             padding:0.45rem 1.1rem;
             border-radius:20px;
             font-weight:500;
+        }
+
+        /* NAVBAR – stack on small screens */
+        @media (max-width: 768px) {
+            .navbar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .nav-right {
+                margin-top: 0.25rem;
+                justify-content: flex-start;
+            }
+            .nav-right span {
+                margin-left: 0;
+                margin-right: 0.75rem;
+                margin-top: 0.15rem;
+                font-size: 0.85rem;
+            }
         }
 
         /* HERO */
@@ -254,7 +287,29 @@ st.markdown(
             box-shadow: 0 15px 35px rgba(15,23,42,0.35);
             max-width: 360px;
             width: 100%;
+            height: auto;
             display: block;
+            object-fit: cover;
+        }
+
+        /* HERO – mobile: stack and shrink fonts/padding */
+        @media (max-width: 900px) {
+            .hero {
+                flex-direction: column-reverse;
+                align-items: flex-start;
+                padding: 2rem 1.4rem;
+                margin-bottom: 2rem;
+            }
+            .hero-title {
+                font-size: 2.1rem;
+            }
+            .hero-sub {
+                font-size: 0.95rem;
+                max-width: 100%;
+            }
+            .hero-image {
+                max-width: 100%;
+            }
         }
 
         /* SECTION HEADINGS */
@@ -271,6 +326,16 @@ st.markdown(
             color: #64748b;
             max-width: 780px;
             margin: 0 auto 1.6rem auto;
+        }
+
+        @media (max-width: 768px) {
+            .section-title {
+                font-size: 1.6rem;
+            }
+            .section-subtitle {
+                font-size: 0.9rem;
+                padding: 0 0.3rem;
+            }
         }
 
         /* FEATURE CARDS */
@@ -300,6 +365,13 @@ st.markdown(
             text-align: center;
         }
 
+        /* FEATURE GRID – stack on mobile */
+        @media (max-width: 900px) {
+            .feature-grid {
+                flex-direction: column;
+            }
+        }
+
         /* FORM CARD */
         .form-card {
             background: white;
@@ -314,6 +386,15 @@ st.markdown(
             font-weight: 600;
             margin-bottom: 0.4rem;
             color: #12355b;
+        }
+
+        @media (max-width: 768px) {
+            .form-card {
+                padding: 1.5rem 1.2rem;
+            }
+            .form-section-title {
+                font-size: 1.05rem;
+            }
         }
 
         /* RESULTS CARD */
@@ -335,6 +416,15 @@ st.markdown(
             color: #1e293b;
         }
 
+        @media (max-width: 768px) {
+            .results-card {
+                padding: 1.4rem 1.2rem;
+            }
+            .results-highlight {
+                font-size: 0.88rem;
+            }
+        }
+
         /* FOOTER */
         .footer {
             margin-top: 1.5rem;
@@ -343,6 +433,11 @@ st.markdown(
             font-size: 0.8rem;
             color: #94a3b8;
             text-align: center;
+        }
+        @media (max-width: 768px) {
+            .footer {
+                font-size: 0.75rem;
+            }
         }
     </style>
     """,
