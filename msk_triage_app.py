@@ -72,6 +72,8 @@ def recommend_treatment(input_dict, model=model, treatment_modalities=TREATMENT_
 # 2. GOOGLE PLACES (NEW) – THERAPIST LOOKUP
 # =========================================
 
+# IMPORTANT: set this in Streamlit secrets:
+# GOOGLE_PLACES_API_KEY = "YOUR_REAL_KEY"
 GOOGLE_PLACES_API_KEY = st.secrets.get("GOOGLE_PLACES_API_KEY", "")
 
 
@@ -96,12 +98,14 @@ def search_therapists_with_google(location_text: str,
             "Set GOOGLE_PLACES_API_KEY in your Streamlit secrets."
         )
 
+    # Build a natural query, e.g. "physio therapist Sevenoaks"
     query = f"{modality} therapist {location_text}"
 
     url = "https://places.googleapis.com/v1/places:searchText"
     headers = {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": api_key,
+        # Request only the fields we need (required by Places API New)
         "X-Goog-FieldMask": (
             "places.displayName,"
             "places.formattedAddress,"
@@ -119,6 +123,7 @@ def search_therapists_with_google(location_text: str,
     except Exception as e:
         return pd.DataFrame(), f"Request to Google Places failed: {e}"
 
+    # New API returns errors in an "error" object
     if "error" in data:
         msg = data["error"].get("message", "Unknown error from Google Places API.")
         return pd.DataFrame(), f"Google Places error: {msg}"
@@ -142,6 +147,7 @@ def search_therapists_with_google(location_text: str,
 
     df = pd.DataFrame(rows)
 
+    # Sort: highest rating, then most reviews
     if not df.empty:
         df = df.sort_values(
             by=["Rating", "Reviews"],
@@ -161,7 +167,7 @@ st.set_page_config(
     layout="wide",
 )
 
-# Global CSS – mobile-optimised, Visiba-inspired aesthetic
+# Global CSS – Visiba-inspired aesthetic
 st.markdown(
     """
     <style>
@@ -170,40 +176,24 @@ st.markdown(
             background-color: #f7f9fb;
         }
 
-        /* Main content wrapper */
         .block-container {
-            padding-top: 1.2rem !important;
-            padding-bottom: 0rem !important;
-            max-width: 1100px !important;
-        }
-
-        /* Ensure everything is nicely padded on small screens */
-        @media (max-width: 768px) {
-            .block-container {
-                padding-left: 0.8rem !important;
-                padding-right: 0.8rem !important;
-            }
+            padding-top: 1.5rem;
+            padding-bottom: 0rem;
+            max-width: 1100px;
         }
 
         /* NAV BAR */
         .navbar {
             width: 100%;
-            padding: 0.8rem 0 0.8rem 0;
+            padding: 1.0rem 0 1.0rem 0;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            gap: 0.75rem;
         }
         .nav-left {
-            font-size: 1.3rem;
+            font-size: 1.4rem;
             font-weight: 600;
             color: #12355b;
-        }
-        .nav-right {
-            display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-            justify-content: flex-end;
         }
         .nav-right span {
             margin-left: 1.1rem;
@@ -222,90 +212,49 @@ st.markdown(
             font-weight:500;
         }
 
-        /* NAVBAR – MOBILE */
-        @media (max-width: 768px) {
-            .navbar {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            .nav-right {
-                margin-top: 0.25rem;
-                justify-content: flex-start;
-            }
-            .nav-right span {
-                margin-left: 0;
-                margin-right: 0.75rem;
-                margin-top: 0.15rem;
-                font-size: 0.85rem;
-            }
-        }
-
         /* HERO */
         .hero {
             background: #d7e8ef;
-            padding: 2.6rem 2.4rem;
+            padding: 3.5rem 3rem;
             border-radius: 1rem;
-            margin-bottom: 2.5rem;
+            margin-bottom: 3rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             gap: 2.5rem;
         }
         .hero-title {
-            font-size: 2.8rem;
+            font-size: 3rem;
             font-family: Georgia, 'Times New Roman', serif;
             color: #12355b;
             line-height: 1.15;
         }
         .hero-sub {
-            font-size: 1.02rem;
+            font-size: 1.05rem;
             margin-top: 1rem;
             color: #243b53;
             max-width: 430px;
         }
         .hero-btn {
-            margin-top: 1.6rem;
+            margin-top: 1.8rem;
             display: inline-block;
             padding: 0.8rem 1.7rem;
             background: #0059ff;
             color: white !important;
             border-radius: 30px;
-            font-size: 0.96rem;
+            font-size: 0.98rem;
             font-weight: 600;
             text-decoration: none !important;
         }
         .hero-btn:hover {
             background: #0042c4;
         }
-
-        /* HERO IMAGE – RESPONSIVE */
         .hero-image {
             border-radius: 0.8rem;
             box-shadow: 0 15px 35px rgba(15,23,42,0.35);
-            width: 100%;
             max-width: 360px;
-            height: auto;
+            width: 100%;
             display: block;
-            object-fit: cover;
-        }
-
-        /* HERO – MOBILE LAYOUT */
-        @media (max-width: 900px) {
-            .hero {
-                flex-direction: column-reverse;
-                align-items: flex-start;
-                padding: 1.8rem 1.4rem;
-            }
-            .hero-title {
-                font-size: 2.1rem;
-            }
-            .hero-sub {
-                font-size: 0.95rem;
-                max-width: 100%;
-            }
-            .hero-image {
-                max-width: 100%;
-            }
         }
 
         /* SECTION HEADINGS */
@@ -322,15 +271,6 @@ st.markdown(
             color: #64748b;
             max-width: 780px;
             margin: 0 auto 1.6rem auto;
-        }
-        @media (max-width: 768px) {
-            .section-title {
-                font-size: 1.6rem;
-            }
-            .section-subtitle {
-                font-size: 0.9rem;
-                padding: 0 0.3rem;
-            }
         }
 
         /* FEATURE CARDS */
@@ -360,13 +300,6 @@ st.markdown(
             text-align: center;
         }
 
-        /* FEATURE GRID – MOBILE STACKING */
-        @media (max-width: 900px) {
-            .feature-grid {
-                flex-direction: column;
-            }
-        }
-
         /* FORM CARD */
         .form-card {
             background: white;
@@ -381,14 +314,6 @@ st.markdown(
             font-weight: 600;
             margin-bottom: 0.4rem;
             color: #12355b;
-        }
-        @media (max-width: 768px) {
-            .form-card {
-                padding: 1.4rem 1.2rem;
-            }
-            .form-section-title {
-                font-size: 1.05rem;
-            }
         }
 
         /* RESULTS CARD */
@@ -409,14 +334,6 @@ st.markdown(
             font-size: 0.92rem;
             color: #1e293b;
         }
-        @media (max-width: 768px) {
-            .results-card {
-                padding: 1.4rem 1.2rem;
-            }
-            .results-highlight {
-                font-size: 0.88rem;
-            }
-        }
 
         /* FOOTER */
         .footer {
@@ -426,11 +343,6 @@ st.markdown(
             font-size: 0.8rem;
             color: #94a3b8;
             text-align: center;
-        }
-        @media (max-width: 768px) {
-            .footer {
-                font-size: 0.75rem;
-            }
         }
     </style>
     """,
@@ -480,7 +392,7 @@ with hero_col:
             </div>
             <div>
                 <img class="hero-image"
-                     src="https://images.unsplash.com/photo-1514996937319-344454492b37?auto=format&fit=crop&w=800&q=80"
+                     src="https://flextron.shop/cdn/shop/articles/RECOVER.png?v=1654161119"
                      alt="Soft tissue injury physiotherapy illustration">
             </div>
         </div>
@@ -610,7 +522,7 @@ with st.container():
             min_value=0, max_value=10, value=5
         )
 
-        # Location for therapist lookup
+        # NEW: Location for therapist lookup
         st.markdown('<div class="form-section-title" style="margin-top:1.0rem;">5. Where are you based?</div>', unsafe_allow_html=True)
         location_text = st.text_input(
             "Enter your location (e.g., 'Sevenoaks TN13', 'Manchester', 'SW1A 1AA'):",
@@ -649,6 +561,7 @@ if submitted:
     with st.spinner("Running model and simulating treatment options..."):
         df_results = recommend_treatment(input_dict)
 
+    # Prepare display
     df_display = df_results.copy()
     df_display["predicted_success_prob"] = (df_display["predicted_success_prob"] * 100).round(1)
     df_display.rename(columns={"predicted_success_prob": "Predicted success (%)"}, inplace=True)
@@ -712,8 +625,9 @@ if submitted:
             f"Showing results for: **{top_modality.title()} therapists near {location_text}**"
         )
 
+        # Show as a nice table with clickable links
         display_df = therapists_df.copy()
-
+        # Render website/maps as markdown links if present
         def make_link(url, label):
             if isinstance(url, str) and url:
                 return f"[{label}]({url})"
