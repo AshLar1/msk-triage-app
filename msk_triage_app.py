@@ -2,13 +2,30 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+import requests
 
+# These sklearn imports are needed so the pickled pipeline can be unpickled
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
 
+# OpenAI (agentic AI)
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None
+
+# =========================================
+# 0. SECRETS & CLIENTS
+# =========================================
+GOOGLE_MAPS_API_KEY = st.secrets.get("GOOGLE_MAPS_API_KEY", None)
+OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", None)
+
+openai_client = None
+if OPENAI_API_KEY and OpenAI is not None:
+    openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 # =========================================
 # 1. MODEL LOADING & TRIAGE LOGIC
@@ -69,7 +86,119 @@ def recommend_treatment(input_dict, model=model, treatment_modalities=TREATMENT_
 
 
 # =========================================
-# 2. PAGE CONFIG & GLOBAL STYLES
+# 2. GOOGLE PLACES & AGENTIC AI HELPERS
+# =========================================
+def find_therapists_nearby(location_query, modality, api_key, max_results=3):
+    """
+    Use Google Places Text Search to find therapists near the given location.
+    modality: 'physio', 'osteopath', 'chiropractor', 'sports_massage', etc.
+    Returns a list of dicts: name, rating, reviews, address, maps_url.
+    """
+    if not api_key or not location_query:
+        return []
+
+    modality_map = {
+        "physio": "physiotherapist",
+        "physiotherapy": "physiotherapist",
+        "chiropractor": "chiropractor",
+        "osteopath": "osteopath",
+        "sports_massage": "sports massage therapist",
+    }
+    search_term = modality_map.get(modality, "physiotherapist")
+
+    query = f"{search_term} near {location_query}"
+
+    url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+    params = {
+        "query": query,
+        "key": api_key,
+    }
+
+    try:
+        resp = requests.get(url, params=params, timeout=8)
+    except Exception:
+        return []
+
+    if resp.status_code != 200:
+        return []
+
+    data = resp.json()
+    results = data.get("results", [])
+
+    cleaned = []
+    for r in results:
+        rating = r.get("rating", 0)
+        reviews = r.get("user_ratings_total", 0)
+        if rating >= 4.0 and reviews >= 5:
+            place_id = r.get("place_id")
+            maps_url = f"https://www.google.com/maps/place/?q=place_id:{place_id}" if place_id else ""
+            cleaned.append({
+                "name": r.get("name"),
+                "rating": rating,
+                "reviews": reviews,
+                "address": r.get("formatted_address"),
+                "maps_url": maps_url,
+            })
+
+    cleaned.sort(key=lambda x: (-x["rating"], -x["reviews"]))
+    return cleaned[:max_results]
+
+
+def generate_agentic_recommendation(case_dict, best_modality, therapists):
+    """
+    Use OpenAI to generate a short, friendly summary explaining:
+    - why this modality was suggested,
+    - that this is a synthetic prototype,
+    - how the listed therapists might fit.
+    Returns a string or None.
+    """
+    if not openai_client or not therapists:
+        return None
+
+    therapist_text = "\n".join(
+        [f"- {t['name']} (⭐ {t['rating']} from {t['reviews']} reviews, {t['address']})"
+         for t in therapists]
+    )
+
+    system_prompt = (
+        "You are an assistant describing an AI-powered MSK triage prototype. "
+        "You MUST NOT give medical advice or instructions. "
+        "Explain the model's suggestion in plain language, emphasise that it is synthetic and not for clinical use, "
+        "and describe the local therapist options neutrally."
+    )
+
+    user_prompt = f"""
+    The model's top suggested treatment modality is: {best_modality}.
+
+    Synthetic case details:
+    {case_dict}
+
+    Local therapists (from Google Places):
+    {therapist_text}
+
+    Write a short paragraph (5–7 sentences) that:
+    - explains in plain language why {best_modality} tends to be useful for this type of case,
+    - reassures that this is a demo using synthetic data and not a medical device,
+    - mentions 1–2 of the therapists by name as examples users could explore,
+    - suggests that users discuss options with qualified clinicians.
+    """
+
+    try:
+        response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.6,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception:
+        return None
+
+
+# =========================================
+# 3. PAGE CONFIG & GLOBAL STYLES
 # =========================================
 st.set_page_config(
     page_title="MSK Triage Prototype",
@@ -77,7 +206,6 @@ st.set_page_config(
     layout="wide",
 )
 
-# Global CSS – Visiba-inspired aesthetic
 st.markdown(
     """
     <style>
@@ -253,7 +381,7 @@ st.markdown(
 )
 
 # =========================================
-# 3. NAVBAR
+# 4. NAVBAR
 # =========================================
 st.markdown(
     """
@@ -272,7 +400,7 @@ st.markdown(
 )
 
 # =========================================
-# 4. HERO SECTION
+# 5. HERO SECTION
 # =========================================
 hero_col = st.container()
 with hero_col:
@@ -294,9 +422,8 @@ with hero_col:
                 <a class="hero-btn" href="#triage-form">Try the triage prototype</a>
             </div>
             <div>
-                <!-- Soft tissue / pain-related illustration -->
-                <img src="https://images.pexels.com/photos/4506109/pexels-photo-4506109.jpeg?auto=compress&cs=tinysrgb&w=700"
-                     alt="Soft tissue injury and pain assessment"
+                <img src="https://images.pexels.com/photos/5281123/pexels-photo-5281123.jpeg?auto=compress&cs=tinysrgb&w=700"
+                     alt="Soft tissue injury illustration"
                      style="border-radius:0.8rem; box-shadow:0 15px 35px rgba(15,23,42,0.35); max-width:360px;">
             </div>
         </div>
@@ -304,9 +431,8 @@ with hero_col:
         unsafe_allow_html=True,
     )
 
-
 # =========================================
-# 5. WHAT IS / IMPACT SECTIONS
+# 6. WHAT IS / IMPACT SECTIONS
 # =========================================
 st.markdown('<a id="what-is"></a>', unsafe_allow_html=True)
 st.markdown('<div class="section-title">What is this MSK triage prototype?</div>', unsafe_allow_html=True)
@@ -346,7 +472,7 @@ st.markdown(
 )
 
 # =========================================
-# 6. FORM – TRIAGE PROTOTYPE
+# 7. FORM – TRIAGE PROTOTYPE
 # =========================================
 st.markdown('<a id="triage-form"></a>', unsafe_allow_html=True)
 st.markdown('<div class="section-title" style="margin-top:3rem;">Try the MSK triage prototype</div>', unsafe_allow_html=True)
@@ -359,7 +485,8 @@ with st.container():
     st.markdown('<div class="form-card">', unsafe_allow_html=True)
 
     with st.form("triage_form"):
-        # Subjective description
+
+        # 1. Subjective description
         st.markdown('<div class="form-section-title">1. Subjective description</div>', unsafe_allow_html=True)
         subjective_injury_description = st.text_area(
             "",
@@ -367,7 +494,7 @@ with st.container():
             height=90
         )
 
-        # Patient & training profile
+        # 2. Patient & training profile
         st.markdown('<div class="form-section-title" style="margin-top:1.0rem;">2. Patient & training profile</div>', unsafe_allow_html=True)
         c1, c2, c3 = st.columns(3)
         with c1:
@@ -384,7 +511,7 @@ with st.container():
                 "Previous injuries (any site)", min_value=0, max_value=20, value=1
             )
 
-        # Injury details
+        # 3. Injury details
         st.markdown('<div class="form-section-title" style="margin-top:1.0rem;">3. Injury details</div>', unsafe_allow_html=True)
         c4, c5 = st.columns(2)
         with c4:
@@ -406,25 +533,26 @@ with st.container():
                 format_func=lambda x: "No" if x == 0 else "Yes"
             )
 
-        # Pain & function
+        # 4. Pain & function
         st.markdown('<div class="form-section-title" style="margin-top:1.0rem;">4. Pain & function</div>', unsafe_allow_html=True)
         c6, c7, c8 = st.columns(3)
         with c6:
-            time_since_onset_days = st.number_input(
-                "Time since onset (days)", min_value=0, max_value=365, value=7
-            )
+            time_since_onset_days = st.number_input("Time since onset (days)", min_value=0, max_value=365, value=7)
         with c7:
-            pain_at_rest = st.number_input(
-                "Pain at rest (0–10)", min_value=0, max_value=10, value=3
-            )
+            pain_at_rest = st.number_input("Pain at rest (0–10)", min_value=0, max_value=10, value=3)
         with c8:
-            pain_on_activity = st.number_input(
-                "Pain on activity (0–10)", min_value=0, max_value=10, value=7
-            )
+            pain_on_activity = st.number_input("Pain on activity (0–10)", min_value=0, max_value=10, value=7)
 
         range_of_motion_limit = st.slider(
             "Range of motion limitation (0 = no restriction, 10 = very restricted)",
             min_value=0, max_value=10, value=5
+        )
+
+        # 5. Location
+        st.markdown('<div class="form-section-title" style="margin-top:1.0rem;">5. Location</div>', unsafe_allow_html=True)
+        location = st.text_input(
+            "Enter your location (e.g., 'London', 'Manchester', 'SW1A 1AA', or a full address)",
+            value="London"
         )
 
         submitted = st.form_submit_button("Run triage simulation")
@@ -432,7 +560,7 @@ with st.container():
     st.markdown('</div>', unsafe_allow_html=True)  # close form-card
 
 # =========================================
-# 7. RUN MODEL & SHOW RESULTS
+# 8. RUN MODEL & SHOW RESULTS + AI THERAPIST SUGGESTIONS
 # =========================================
 if submitted:
     input_dict = {
@@ -454,12 +582,12 @@ if submitted:
         "onset": onset,
         "swelling": swelling,
         "treatment_modality": "physio",  # placeholder; overwritten in simulation
+        "location": location,
     }
 
     with st.spinner("Running model and simulating treatment options..."):
         df_results = recommend_treatment(input_dict)
 
-    # Prepare display
     df_display = df_results.copy()
     df_display["predicted_success_prob"] = (df_display["predicted_success_prob"] * 100).round(1)
     df_display.rename(columns={"predicted_success_prob": "Predicted success (%)"}, inplace=True)
@@ -473,12 +601,16 @@ if submitted:
 
     with col_text:
         best_row = df_display.iloc[0]
+
         st.markdown(
             f"""
             <div class="results-highlight">
                 <b>Top suggestion:</b> {best_row['treatment_modality'].title()}<br>
                 Estimated success likelihood in this synthetic dataset:
                 <b>{best_row['Predicted success (%)']}%</b>.
+                <br><br>
+                <u>Location provided:</u> <b>{location}</b><br>
+                (Used only to look up highly rated therapists in this prototype.)
                 <br><br>
                 In a real deployment, this kind of model would sit alongside clinical
                 judgement, local pathways and safety netting – not replace them.
@@ -495,8 +627,54 @@ if submitted:
 
     st.markdown('</div>', unsafe_allow_html=True)  # close results-card
 
+    # 8b. LOCAL THERAPIST LOOKUP
+    st.markdown("### Therapists in your area (Google-rated)")
+    if not GOOGLE_MAPS_API_KEY:
+        st.caption("To see local therapists, add GOOGLE_MAPS_API_KEY to your Streamlit secrets.")
+        therapists = []
+    elif not location.strip():
+        st.caption("Add a location above to see therapists near you.")
+        therapists = []
+    else:
+        with st.spinner("Finding highly rated therapists near you..."):
+            best_modality = best_row["treatment_modality"]
+            therapists = find_therapists_nearby(
+                location_query=location,
+                modality=best_modality,
+                api_key=GOOGLE_MAPS_API_KEY,
+                max_results=3,
+            )
+
+    if therapists:
+        for t in therapists:
+            st.markdown(
+                f"""
+                **{t['name']}**  
+                ⭐ {t['rating']} ({t['reviews']} Google reviews)  
+                {t['address']}  
+                [View on Google Maps]({t['maps_url']})
+                """
+            )
+    else:
+        st.info("No suitable therapists could be displayed. Try a different location or check your API key.")
+
+    # 8c. AGENTIC AI SUMMARY
+    if therapists and openai_client:
+        with st.spinner("Asking AI to summarise these options..."):
+            summary = generate_agentic_recommendation(
+                case_dict=input_dict,
+                best_modality=best_row["treatment_modality"],
+                therapists=therapists,
+            )
+
+        if summary:
+            st.markdown("### How this might support your MSK pathway")
+            st.write(summary)
+    elif therapists and not openai_client:
+        st.caption("Add OPENAI_API_KEY to your Streamlit secrets to enable AI-written therapist summaries.")
+
 # =========================================
-# 8. FOOTER
+# 9. FOOTER
 # =========================================
 st.markdown(
     """
