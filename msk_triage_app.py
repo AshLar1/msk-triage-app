@@ -10,25 +10,9 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
 
-# ============================================================
-# 0. CONFIG
-# ============================================================
-st.set_page_config(
-    page_title="MSK Triage Prototype",
-    page_icon="💙",
-    layout="wide",
-)
-
-# Toggle this to False once you’re happy
-DEBUG_PLACES = True
-
-# Try to read Google Places key from Streamlit secrets
-PLACES_API_KEY = st.secrets.get("GOOGLE_MAPS_API_KEY", None)
-
-
-# ============================================================
+# =========================================
 # 1. MODEL LOADING & TRIAGE LOGIC
-# ============================================================
+# =========================================
 MODEL_PATH = "msk_triage_rf_model.pkl"
 model = joblib.load(MODEL_PATH)
 
@@ -84,81 +68,106 @@ def recommend_treatment(input_dict, model=model, treatment_modalities=TREATMENT_
     return df_results
 
 
-# ============================================================
-# 2. GOOGLE PLACES HELPER
-# ============================================================
-def find_therapists_nearby(location_query: str,
-                           treatment_modality: str,
-                           max_results: int = 5):
+# =========================================
+# 2. GOOGLE PLACES (NEW) – THERAPIST LOOKUP
+# =========================================
+
+# IMPORTANT: set this in Streamlit secrets:
+# GOOGLE_PLACES_API_KEY = "YOUR_REAL_KEY"
+GOOGLE_PLACES_API_KEY = st.secrets.get("GOOGLE_PLACES_API_KEY", "")
+
+
+def search_therapists_with_google(location_text: str,
+                                  modality: str,
+                                  api_key: str = GOOGLE_PLACES_API_KEY):
     """
-    Use Google Places Text Search to find MSK therapists near a location.
-    Returns (df_results, debug_info).
-    df_results: DataFrame with name, address, rating, user_ratings_total, link
-    debug_info: dict with status / error info for debugging.
+    Uses Places API (New) Text Search to find highly-rated therapists
+    for the given modality near the user-provided location.
+
+    Returns (df, error_message). If error_message is not None, df may be empty.
     """
-    debug_info = {}
+    location_text = (location_text or "").strip()
 
-    if not PLACES_API_KEY:
-        debug_info["error"] = "No GOOGLE_MAPS_API_KEY found in Streamlit secrets."
-        return pd.DataFrame(), debug_info
+    if not location_text:
+        return pd.DataFrame(), "No location provided."
 
-    if not location_query.strip():
-        debug_info["error"] = "Empty location query."
-        return pd.DataFrame(), debug_info
+    if not api_key:
+        return (
+            pd.DataFrame(),
+            "No Google Places API key found. "
+            "Set GOOGLE_PLACES_API_KEY in your Streamlit secrets."
+        )
 
-    query = f"{treatment_modality} therapist {location_query}"
-    url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+    # Build a natural query, e.g. "physio therapist Sevenoaks"
+    query = f"{modality} therapist {location_text}"
 
-    params = {
-        "query": query,
-        "key": PLACES_API_KEY,
-        "type": "physiotherapist",   # hint, Google may still return other clinics
+    url = "https://places.googleapis.com/v1/places:searchText"
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": api_key,
+        # Request only the fields we need (required by Places API New)
+        "X-Goog-FieldMask": (
+            "places.displayName,"
+            "places.formattedAddress,"
+            "places.rating,"
+            "places.userRatingCount,"
+            "places.websiteUri,"
+            "places.googleMapsUri"
+        ),
     }
+    payload = {"textQuery": query}
 
     try:
-        resp = requests.get(url, params=params, timeout=8)
-        debug_info["http_status"] = resp.status_code
-
-        if resp.status_code != 200:
-            debug_info["error"] = f"HTTP {resp.status_code}"
-            return pd.DataFrame(), debug_info
-
+        resp = requests.post(url, headers=headers, json=payload, timeout=10)
         data = resp.json()
-        debug_info["places_status"] = data.get("status")
-
-        if data.get("status") != "OK":
-            debug_info["error"] = f"Places status: {data.get('status')}"
-            return pd.DataFrame(), debug_info
-
-        results = data.get("results", [])[:max_results]
-        if not results:
-            debug_info["error"] = "No results returned."
-            return pd.DataFrame(), debug_info
-
-        rows = []
-        for r in results:
-            rows.append({
-                "Name": r.get("name"),
-                "Address": r.get("formatted_address"),
-                "Rating": r.get("rating"),
-                "Reviews": r.get("user_ratings_total"),
-                "Google Maps": f"https://www.google.com/maps/place/?q=place_id:{r.get('place_id')}",
-            })
-
-        df = pd.DataFrame(rows).sort_values(
-            ["Rating", "Reviews"], ascending=[False, False]
-        ).reset_index(drop=True)
-
-        return df, debug_info
-
     except Exception as e:
-        debug_info["error"] = f"Exception: {e}"
-        return pd.DataFrame(), debug_info
+        return pd.DataFrame(), f"Request to Google Places failed: {e}"
+
+    # New API returns errors in an "error" object
+    if "error" in data:
+        msg = data["error"].get("message", "Unknown error from Google Places API.")
+        return pd.DataFrame(), f"Google Places error: {msg}"
+
+    places = data.get("places", [])
+    if not places:
+        return pd.DataFrame(), "No suitable therapists found for this location."
+
+    rows = []
+    for p in places:
+        rows.append(
+            {
+                "Name": p.get("displayName", {}).get("text", "Unknown"),
+                "Address": p.get("formattedAddress", ""),
+                "Rating": p.get("rating", np.nan),
+                "Reviews": p.get("userRatingCount", 0),
+                "Website": p.get("websiteUri", ""),
+                "Maps URL": p.get("googleMapsUri", ""),
+            }
+        )
+
+    df = pd.DataFrame(rows)
+
+    # Sort: highest rating, then most reviews
+    if not df.empty:
+        df = df.sort_values(
+            by=["Rating", "Reviews"],
+            ascending=[False, False],
+            na_position="last",
+        ).head(5)
+
+    return df, None
 
 
-# ============================================================
-# 3. GLOBAL STYLES
-# ============================================================
+# =========================================
+# 3. PAGE CONFIG & GLOBAL STYLES
+# =========================================
+st.set_page_config(
+    page_title="MSK Triage Prototype",
+    page_icon="💙",
+    layout="wide",
+)
+
+# Global CSS – Visiba-inspired aesthetic
 st.markdown(
     """
     <style>
@@ -240,12 +249,12 @@ st.markdown(
         .hero-btn:hover {
             background: #0042c4;
         }
-        .hero-img {
+        .hero-image {
             border-radius: 0.8rem;
             box-shadow: 0 15px 35px rgba(15,23,42,0.35);
             max-width: 360px;
             width: 100%;
-            height: auto;
+            display: block;
         }
 
         /* SECTION HEADINGS */
@@ -340,10 +349,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-
-# ============================================================
+# =========================================
 # 4. NAVBAR
-# ============================================================
+# =========================================
 st.markdown(
     """
     <div class="navbar">
@@ -360,10 +368,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-
-# ============================================================
+# =========================================
 # 5. HERO SECTION
-# ============================================================
+# =========================================
 hero_col = st.container()
 with hero_col:
     st.markdown(
@@ -384,19 +391,18 @@ with hero_col:
                 <a class="hero-btn" href="#triage-form">Try the triage prototype</a>
             </div>
             <div>
-                <img class="hero-img"
-                     src="https://images.unsplash.com/photo-1517341724300-188542e1c1c7?auto=format&fit=crop&w=800&q=80"
-                     alt="Soft tissue physiotherapy illustration">
+                <img class="hero-image"
+                     src="https://images.unsplash.com/photo-1514996937319-344454492b37?auto=format&fit=crop&w=800&q=80"
+                     alt="Soft tissue injury physiotherapy illustration">
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-
-# ============================================================
+# =========================================
 # 6. WHAT IS / IMPACT SECTIONS
-# ============================================================
+# =========================================
 st.markdown('<a id="what-is"></a>', unsafe_allow_html=True)
 st.markdown('<div class="section-title">What is this MSK triage prototype?</div>', unsafe_allow_html=True)
 st.markdown(
@@ -434,10 +440,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-
-# ============================================================
+# =========================================
 # 7. FORM – TRIAGE PROTOTYPE
-# ============================================================
+# =========================================
 st.markdown('<a id="triage-form"></a>', unsafe_allow_html=True)
 st.markdown('<div class="section-title" style="margin-top:3rem;">Try the MSK triage prototype</div>', unsafe_allow_html=True)
 st.markdown(
@@ -517,21 +522,20 @@ with st.container():
             min_value=0, max_value=10, value=5
         )
 
-        # Patient location for therapist lookup
-        st.markdown('<div class="form-section-title" style="margin-top:1.0rem;">5. Your location (for therapist suggestions)</div>', unsafe_allow_html=True)
-        user_location = st.text_input(
-            "Enter your location (e.g., 'Sevenoaks TN13', 'Manchester', 'SW1A 1AA', or a full address)",
-            value=""
+        # NEW: Location for therapist lookup
+        st.markdown('<div class="form-section-title" style="margin-top:1.0rem;">5. Where are you based?</div>', unsafe_allow_html=True)
+        location_text = st.text_input(
+            "Enter your location (e.g., 'Sevenoaks TN13', 'Manchester', 'SW1A 1AA'):",
+            value="Sevenoaks TN13 1DJ"
         )
 
         submitted = st.form_submit_button("Run triage simulation")
 
     st.markdown('</div>', unsafe_allow_html=True)  # close form-card
 
-
-# ============================================================
+# =========================================
 # 8. RUN MODEL & SHOW RESULTS
-# ============================================================
+# =========================================
 if submitted:
     input_dict = {
         "subjective_injury_description": subjective_injury_description,
@@ -578,10 +582,8 @@ if submitted:
                 Estimated success likelihood in this synthetic dataset:
                 <b>{best_row['Predicted success (%)']}%</b>.
                 <br><br>
-                Location provided: <b>{user_location or 'Not specified'}</b><br>
-                <span style="font-size:0.85rem; color:#64748b;">
+                Location provided: <b>{location_text}</b><br>
                 (Used only to look up highly rated therapists in this prototype.)
-                </span>
                 <br><br>
                 In a real deployment, this kind of model would sit alongside clinical
                 judgement, local pathways and safety netting – not replace them.
@@ -598,38 +600,48 @@ if submitted:
 
     st.markdown('</div>', unsafe_allow_html=True)  # close results-card
 
-    # --------------------------------------------------------
-    # Therapist recommendation section
-    # --------------------------------------------------------
-    st.markdown("### Therapists in your area (Google-rated)")
-
-    therapists_df, debug_info = find_therapists_nearby(
-        user_location, best_row["treatment_modality"]
+    # =====================================
+    # 9. THERAPIST RECOMMENDATIONS (PLACES)
+    # =====================================
+    st.markdown(
+        '<div class="section-title" style="margin-top:1.5rem; text-align:left;">Therapists in your area (Google-rated)</div>',
+        unsafe_allow_html=True,
     )
 
-    if therapists_df.empty:
-        if not PLACES_API_KEY:
-            st.info(
-                "Google Places API key not configured. "
-                "Add `GOOGLE_MAPS_API_KEY` to your Streamlit secrets to enable local therapist suggestions."
-            )
-        else:
-            st.warning(
-                "No suitable therapists could be displayed. "
-                "Try a different location or check your Google Places API configuration."
-            )
+    top_modality = df_display.iloc[0]["treatment_modality"]
+
+    with st.spinner("Looking up highly rated therapists via Google Places..."):
+        therapists_df, places_error = search_therapists_with_google(location_text, top_modality)
+
+    if places_error:
+        st.info(
+            f"No suitable therapists could be displayed.\n\n"
+            f"Details: {places_error}"
+        )
+    elif therapists_df.empty:
+        st.info("No suitable therapists found for this location and modality.")
     else:
-        st.dataframe(therapists_df, use_container_width=True)
+        st.markdown(
+            f"Showing results for: **{top_modality.title()} therapists near {location_text}**"
+        )
 
-    # Optional debug info (no secret values)
-    if DEBUG_PLACES and debug_info:
-        with st.expander("Debug info (Google Places)", expanded=False):
-            st.json(debug_info)
+        # Show as a nice table with clickable links
+        display_df = therapists_df.copy()
+        # Render website/maps as markdown links if present
+        def make_link(url, label):
+            if isinstance(url, str) and url:
+                return f"[{label}]({url})"
+            return ""
 
+        display_df["Website"] = display_df["Website"].apply(lambda u: make_link(u, "Website"))
+        display_df["Maps"] = display_df["Maps URL"].apply(lambda u: make_link(u, "View on Maps"))
+        display_df = display_df.drop(columns=["Maps URL"])
 
-# ============================================================
-# 9. FOOTER
-# ============================================================
+        st.table(display_df)
+
+# =========================================
+# 10. FOOTER
+# =========================================
 st.markdown(
     """
     <div class="footer">
