@@ -3,16 +3,13 @@ import pandas as pd
 import numpy as np
 import joblib
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
 
+# =====================================================
+# 1. LOAD MODEL & DEFINE TRIAGE LOGIC
+# =====================================================
 
-# =========================================
-# 1. MODEL LOADING & TRIAGE LOGIC
-# =========================================
 MODEL_PATH = "msk_triage_rf_model.pkl"
 model = joblib.load(MODEL_PATH)
 
@@ -42,7 +39,7 @@ required_cols = triage_text_features + triage_numeric_features + triage_categori
 
 def recommend_treatment(input_dict, model=model, treatment_modalities=TREATMENT_MODALITIES):
     """
-    Takes a single case (dict), simulates each treatment modality,
+    Takes a single patient case (dict), simulates each treatment modality,
     and returns a DataFrame with predicted success probabilities.
     """
     base = pd.Series(input_dict)
@@ -60,24 +57,27 @@ def recommend_treatment(input_dict, model=model, treatment_modalities=TREATMENT_
     sim_df = pd.DataFrame(simulated_rows)[required_cols]
     probs = model.predict_proba(sim_df)[:, 1]
 
-    df_results = pd.DataFrame({
-        "treatment_modality": treatment_modalities,
-        "predicted_success_prob": probs
-    }).sort_values("predicted_success_prob", ascending=False).reset_index(drop=True)
+    df_results = pd.DataFrame(
+        {
+            "treatment_modality": treatment_modalities,
+            "predicted_success_prob": probs,
+        }
+    ).sort_values("predicted_success_prob", ascending=False).reset_index(drop=True)
 
     return df_results
 
 
-# =========================================
+# =====================================================
 # 2. PAGE CONFIG & GLOBAL STYLES
-# =========================================
+# =====================================================
+
 st.set_page_config(
     page_title="MSK Triage Prototype",
     page_icon="💙",
     layout="wide",
 )
 
-# Global CSS – Visiba-inspired aesthetic
+# Global CSS
 st.markdown(
     """
     <style>
@@ -270,9 +270,10 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# =========================================
+# =====================================================
 # 3. NAVBAR
-# =========================================
+# =====================================================
+
 st.markdown(
     """
     <div class="navbar">
@@ -289,12 +290,10 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# =========================================
-# 4. HERO SECTION (UPDATED IMAGE)
-# =========================================
-# =========================================
+# =====================================================
 # 4. HERO SECTION
-# =========================================
+# =====================================================
+
 hero_html = """
 <div class="hero">
     <div class="hero-left">
@@ -326,16 +325,19 @@ hero_html = """
              style="border-radius:1rem; box-shadow:0 15px 35px rgba(15,23,42,0.35); max-width:360px;">
     </div>
 </div>
-"""  
+"""
 
 st.markdown(hero_html, unsafe_allow_html=True)
 
+# =====================================================
+# 5. "WHAT IS" & IMPACT SECTIONS
+# =====================================================
 
-# =========================================
-# 5. WHAT IS / IMPACT SECTIONS
-# =========================================
 st.markdown('<a id="what-is"></a>', unsafe_allow_html=True)
-st.markdown('<div class="section-title">What is this MSK triage prototype?</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="section-title">What is this MSK triage prototype?</div>',
+    unsafe_allow_html=True,
+)
 st.markdown(
     """
     <div class="section-subtitle">
@@ -371,11 +373,15 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# =========================================
-# 6. FORM – TRIAGE PROTOTYPE
-# =========================================
+# =====================================================
+# 6. TRIAGE FORM
+# =====================================================
+
 st.markdown('<a id="triage-form"></a>', unsafe_allow_html=True)
-st.markdown('<div class="section-title" style="margin-top:3rem;">Try the MSK triage prototype</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="section-title" style="margin-top:3rem;">Try the MSK triage prototype</div>',
+    unsafe_allow_html=True,
+)
 st.markdown(
     '<div class="section-subtitle">Use the example case below or adjust the fields to mirror a typical injury from your service.</div>',
     unsafe_allow_html=True,
@@ -386,21 +392,33 @@ with st.container():
 
     with st.form("triage_form"):
         # Subjective description
-        st.markdown('<div class="form-section-title">1. Subjective description</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="form-section-title">1. Subjective description</div>',
+            unsafe_allow_html=True,
+        )
         subjective_injury_description = st.text_area(
             "",
-            value="Felt a sharp pain in the back of my thigh while sprinting. Pain is worse with fast running and high-speed drills.",
-            height=90
+            value=(
+                "Felt a sharp pain in the back of my thigh while sprinting. "
+                "Pain is worse with fast running and high-speed drills."
+            ),
+            height=90,
         )
 
         # Patient & training profile
-        st.markdown('<div class="form-section-title" style="margin-top:1.0rem;">2. Patient & training profile</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="form-section-title" style="margin-top:1.0rem;">2. Patient & training profile</div>',
+            unsafe_allow_html=True,
+        )
         c1, c2, c3 = st.columns(3)
         with c1:
             age = st.number_input("Age", min_value=16, max_value=80, value=28)
             sex = st.selectbox("Sex", options=["male", "female"])
         with c2:
-            sport = st.selectbox("Sport", options=["football", "running", "tennis", "gym", "rugby", "basketball"])
+            sport = st.selectbox(
+                "Sport",
+                options=["football", "running", "tennis", "gym", "rugby", "basketball"],
+            )
             level = st.selectbox("Sport level", options=["recreational", "semi_pro", "elite"])
         with c3:
             training_hours_per_week = st.number_input(
@@ -411,16 +429,28 @@ with st.container():
             )
 
         # Injury details
-        st.markdown('<div class="form-section-title" style="margin-top:1.0rem;">3. Injury details</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="form-section-title" style="margin-top:1.0rem;">3. Injury details</div>',
+            unsafe_allow_html=True,
+        )
         c4, c5 = st.columns(2)
         with c4:
             injury_site = st.selectbox(
                 "Injury site",
-                options=["hamstring", "quadriceps", "calf", "ankle", "knee", "lower_back", "shoulder", "achilles"]
+                options=[
+                    "hamstring",
+                    "quadriceps",
+                    "calf",
+                    "ankle",
+                    "knee",
+                    "lower_back",
+                    "shoulder",
+                    "achilles",
+                ],
             )
             injury_type = st.selectbox(
                 "Injury type",
-                options=["muscle_strain", "tendonitis", "ligament_sprain", "overuse"]
+                options=["muscle_strain", "tendonitis", "ligament_sprain", "overuse"],
             )
         with c5:
             injury_severity = st.selectbox("Injury severity (1–3)", options=[1, 2, 3])
@@ -429,20 +459,21 @@ with st.container():
             previous_same_site_injury = st.selectbox(
                 "Previous same-site injury?",
                 options=[0, 1],
-                format_func=lambda x: "No" if x == 0 else "Yes"
+                format_func=lambda x: "No" if x == 0 else "Yes",
             )
 
         # Pain & function
-        st.markdown('<div class="form-section-title" style="margin-top:1.0rem;">4. Pain & function</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="form-section-title" style="margin-top:1.0rem;">4. Pain & function</div>',
+            unsafe_allow_html=True,
+        )
         c6, c7, c8 = st.columns(3)
         with c6:
             time_since_onset_days = st.number_input(
                 "Time since onset (days)", min_value=0, max_value=365, value=7
             )
         with c7:
-            pain_at_rest = st.number_input(
-                "Pain at rest (0–10)", min_value=0, max_value=10, value=3
-            )
+            pain_at_rest = st.number_input("Pain at rest (0–10)", min_value=0, max_value=10, value=3)
         with c8:
             pain_on_activity = st.number_input(
                 "Pain on activity (0–10)", min_value=0, max_value=10, value=7
@@ -450,16 +481,19 @@ with st.container():
 
         range_of_motion_limit = st.slider(
             "Range of motion limitation (0 = no restriction, 10 = very restricted)",
-            min_value=0, max_value=10, value=5
+            min_value=0,
+            max_value=10,
+            value=5,
         )
 
         submitted = st.form_submit_button("Run triage simulation")
 
-    st.markdown('</div>', unsafe_allow_html=True)  # close form-card
+    st.markdown("</div>", unsafe_allow_html=True)  # close form-card
 
-# =========================================
+# =====================================================
 # 7. RUN MODEL & SHOW RESULTS
-# =========================================
+# =====================================================
+
 if submitted:
     input_dict = {
         "subjective_injury_description": subjective_injury_description,
@@ -479,19 +513,21 @@ if submitted:
         "injury_severity": int(injury_severity),
         "onset": onset,
         "swelling": swelling,
-        "treatment_modality": "physio",  # placeholder; overwritten in simulation
+        "treatment_modality": "physio",  # placeholder, overwritten in simulation
     }
 
     with st.spinner("Running model and simulating treatment options..."):
         df_results = recommend_treatment(input_dict)
 
-    # Prepare display
     df_display = df_results.copy()
     df_display["predicted_success_prob"] = (df_display["predicted_success_prob"] * 100).round(1)
     df_display.rename(columns={"predicted_success_prob": "Predicted success (%)"}, inplace=True)
 
     st.markdown('<div class="results-card">', unsafe_allow_html=True)
-    st.markdown('<h3 style="margin-bottom:0.6rem; color:#12355b;">Suggested treatment pathways</h3>', unsafe_allow_html=True)
+    st.markdown(
+        '<h3 style="margin-bottom:0.6rem; color:#12355b;">Suggested treatment pathways</h3>',
+        unsafe_allow_html=True,
+    )
 
     col_table, col_text = st.columns([0.55, 0.45])
     with col_table:
@@ -519,11 +555,12 @@ if submitted:
                 "In a live system, this scenario would likely be routed to a high-priority pathway."
             )
 
-    st.markdown('</div>', unsafe_allow_html=True)  # close results-card
+    st.markdown("</div>", unsafe_allow_html=True)  # close results-card
 
-# =========================================
+# =====================================================
 # 8. FOOTER
-# =========================================
+# =====================================================
+
 st.markdown(
     """
     <div class="footer">
