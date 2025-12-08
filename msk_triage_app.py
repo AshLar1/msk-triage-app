@@ -294,14 +294,16 @@ with hero_col:
                 <a class="hero-btn" href="#triage-form">Try the triage prototype</a>
             </div>
             <div>
-                <!-- Simple placeholder illustration - replace with your own URL if you like -->
-                <img src="https://images.pexels.com/photos/6129040/pexels-photo-6129040.jpeg?auto=compress&cs=tinysrgb&w=700"
-                     alt="Digital triage illustration" style="border-radius:0.8rem; box-shadow:0 15px 35px rgba(15,23,42,0.35); max-width:360px;">
+                <!-- Soft tissue / pain-related illustration -->
+                <img src="https://images.pexels.com/photos/4506109/pexels-photo-4506109.jpeg?auto=compress&cs=tinysrgb&w=700"
+                     alt="Soft tissue injury and pain assessment"
+                     style="border-radius:0.8rem; box-shadow:0 15px 35px rgba(15,23,42,0.35); max-width:360px;">
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
 
 # =========================================
 # 5. WHAT IS / IMPACT SECTIONS
