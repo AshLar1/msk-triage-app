@@ -392,7 +392,7 @@ with hero_col:
             </div>
             <div>
                 <img class="hero-image"
-                     src="https://flextron.shop/cdn/shop/articles/RECOVER.png?v=1654161119"
+                     src="https://cdn.shopify.com/s/files/1/0247/5589/6405/files/iStock-1555904621_480x480.jpg?v=1721329394"
                      alt="Soft tissue injury physiotherapy illustration">
             </div>
         </div>
