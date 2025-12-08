@@ -392,7 +392,7 @@ with hero_col:
             </div>
             <div>
                 <img class="hero-image"
-                     src="https://images.pexels.com/photos/3861453/pexels-photo-3861453.jpeg?auto=compress&cs=tinysrgb&w=800"
+                     src="https://images.pexels.com/photos/4506100/pexels-photo-4506100.jpeg?auto=compress&cs=tinysrgb&w=800"
                      alt="Soft tissue injury physiotherapy illustration">
             </div>
         </div>
